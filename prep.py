@@ -34,7 +34,7 @@ def matched_or_reversed(df, ref_allele, suffix, d):
         ((ref_allele[0] == 3 - allele[0]) & (ref_allele[1] == 3 - allele[1])))
     reversed_alleles = (((ref_allele[0] == allele[1]) & (ref_allele[1] == allele[0])) |
         ((ref_allele[0] == 3 - allele[1]) & (ref_allele[1] == 3 - allele[0])))
-    df["Z_{}".format(suffix)] *= -2 * reversed_alleles + 1
+    df.loc[:, "Z_{}".format(suffix)] *= -2 * reversed_alleles + 1
     df = df.loc[(matched_alleles|reversed_alleles)]
     ref_allele[0] = ref_allele[0][matched_alleles|reversed_alleles]
     ref_allele[1] = ref_allele[1][(matched_alleles|reversed_alleles)]
