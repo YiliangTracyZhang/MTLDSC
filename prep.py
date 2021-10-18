@@ -95,9 +95,11 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
         df = df.merge(df_sumstats_combine[i], on=['SNP'])
 
     # flip sign of z-score for allele reversals
+    print(1)
     allign_alleles(df, Nsumstats)
+    print(1)
     df = df.loc[np.logical_not(df.SNP.duplicated(keep=False))]
-
+    print(1)
     Z_y = np.zeros(len(df), dtype=float)
     if Nlst is None:
         df_Nlst = pd.DataFrame({'N':[np.max(df['N_{}'.format(i)]) 
