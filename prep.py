@@ -113,6 +113,6 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
     if N1 is None:
         N1 = df['N_x'].max()
 
-    return (df[['CHR', 'SNP', 'Z_x', 'Z_y']],
+    return (df.loc[:, ['CHR', 'SNP', 'Z_x', 'Z_y']],
             N1)
  
