@@ -2,7 +2,6 @@ import os
 
 import numpy as np
 import pandas as pd
-from pandas.core.indexing import need_slice
 
 def allign_alleles(df, Nsumstats):
     """Look for reversed alleles and inverts the z-score for one of them.
@@ -20,7 +19,6 @@ def allign_alleles(df, Nsumstats):
     df = matched_or_reversed(df, ref_allele, 'x', d)
     for i in range(Nsumstats):
         df = matched_or_reversed(df, ref_allele, i, d)
-    return df
 
 def matched_or_reversed(df, ref_allele, suffix, d):
     allele = []
@@ -97,8 +95,8 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
         df = df.merge(df_sumstats_combine[i], on=['SNP'])
 
     # flip sign of z-score for allele reversals
-    df = allign_alleles(df, Nsumstats)
-    df = df[np.logical_not(df.SNP.duplicated(keep=False))]
+    allign_alleles(df, Nsumstats)
+    df = df.loc[np.logical_not(df.SNP.duplicated(keep=False))]
 
     Z_y = np.zeros(len(df), dtype=float)
     if Nlst is None:
