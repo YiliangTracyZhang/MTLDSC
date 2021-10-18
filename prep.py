@@ -2,44 +2,43 @@ import os
 
 import numpy as np
 import pandas as pd
+from pandas.core.indexing import need_slice
 
-def allign_alleles(df):
+def allign_alleles(df, Nsumstats):
     """Look for reversed alleles and inverts the z-score for one of them.
 
     Here, we take advantage of numpy's vectorized functions for performance.
     """
     d = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
-    alleles = []
-    for colname in ['A1_x', 'A2_x', 'A1_y', 'A2_y']:
+    ref_allele = []
+    for colname in ['A1_ref', 'A2_ref']:
         tmp = np.empty(len(df[colname]), dtype=int)
         for k, v in d.items():
-            tmp[np.array(df[colname]) == k] = v
-        alleles.append(tmp)
-    reversed_alleles = np.logical_and(alleles[0] == alleles[3],
-        alleles[1] == alleles[2])
-    reversed_strand_flip_alleles = np.logical_and(alleles[0] == 3 - alleles[3],
-        alleles[1] == 3 - alleles[2])
-    to_flip = np.logical_or(reversed_alleles, reversed_strand_flip_alleles)
-    df['Z_y'] *= -2 * to_flip + 1
+            tmp[df[colname] == k] = v
+        ref_allele.append(tmp)
 
+    df = matched_or_reversed(df, ref_allele, 'x', d)
+    for i in range(Nsumstats):
+        df = matched_or_reversed(df, ref_allele, i, d)
 
-def matched_or_reversed(df):
-    """Returns boolean array signifying whether rows have matched or reversed
-    alleles.
-    """
-    d = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
-    a = []  # array of alleles
-    for colname in ['A1_x', 'A2_x', 'A1_y', 'A2_y']:
+def matched_or_reversed(df, ref_allele, suffix, d):
+    allele = []
+    A1_colname = "A1_{}".format(suffix)
+    A2_colname = "A2_{}".format(suffix)
+    for colname in [A1_colname, A2_colname]:
         tmp = np.empty(len(df[colname]), dtype=int)
         for k, v in d.items():
-            tmp[np.array(df[colname]) == k] = v
-        a.append(tmp)
-    matched_alleles = (((a[0] == a[2]) & (a[1] == a[3])) |
-        ((a[0] == 3 - a[2]) & (a[1] == 3 - a[3])))
-    reversed_alleles = (((a[0] == a[3]) & (a[1] == a[2])) |
-        ((a[0] == 3 - a[0]) & (a[1] == 3 - a[2])))
-    return matched_alleles | reversed_alleles
-
+            tmp[df[colname] == k] = v
+        allele.append(tmp)
+    matched_alleles = (((ref_allele[0] == allele[0]) & (ref_allele[1] == allele[1])) | 
+        ((ref_allele[0] == 3 - allele[0]) & (ref_allele[1] == 3 - allele[1])))
+    reversed_alleles = (((ref_allele[0] == allele[1]) & (ref_allele[1] == allele[0])) |
+        ((ref_allele[0] == 3 - allele[1]) & (ref_allele[1] == 3 - allele[0])))
+    df["Z_{}".format(suffix)] *= -2 * reversed_alleles + 1
+    df = df.loc[(matched_alleles|reversed_alleles)]
+    ref_allele[0] = ref_allele[0][matched_alleles|reversed_alleles]
+    ref_allele[1] = ref_allele[1][(matched_alleles|reversed_alleles)]
+    return df
 
 def get_files(file_name):
     if '@' in file_name:
@@ -59,15 +58,8 @@ def get_files(file_name):
             ValueError('No files matching {}'.format(file_name))
 
 
-def prep(bfile, annot, sumstats1, sumstats2):
+def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
     bim_files = get_files(bfile + '.bim')
-
-    if annot is not None:
-        annot_files = get_files(annot)
-        len_b, len_a = len(bim_files), len(annot_files)
-        if len_b != len_a and len_b > 1 and len_a > 1:
-            raise ValueError("The number of bim files and annotation files " +
-                             "should be the same.")
 
     # read in bim files
     bims = [pd.read_csv(f,
@@ -76,40 +68,52 @@ def prep(bfile, annot, sumstats1, sumstats2):
                         delim_whitespace=True) for f in bim_files]
     bim = pd.concat(bims, ignore_index=True)
 
-    # read in annotation files
-    if annot is not None:
-        annots = [pd.read_csv(f, delim_whitespace=True) for f in annot_files]
-        for i, a in enumerate(annots):
-            if len(a) != len(bims[i]):
-                raise ValueError("Number of rows in bim and annotation " +
-                                 "files are not equal for {} and {}".format(
-                                    bim_files[i], annot_files[i]))
-            annots[i] = pd.concat([bims[i][['CHR', 'SNP', 'BP', 'CM']],
-                                   pd.Series(np.ones(len(a))),
-                                   a], axis=1)
-            annots[i].rename(columns={0: 'ALL_'}, inplace=True)
-    else:
-        annots = None
+    sumstats_combine = pd.read_csv(sumstatslst,
+                                    header=None,
+                                    names=['sumstats', 'weights'],
+                                    delim_whitespace=True)                       
+    Nsumstats = len(sumstats_combine)
 
-    dfs = [pd.read_csv(file, delim_whitespace=True)
-        for file in [sumstats1, sumstats2]]
+    df_sumstats1 = pd.read_csv(sumstats1, delim_whitespace=True)
+
+    df_sumstats_combine = [pd.read_csv(file, delim_whitespace=True)
+                            for file in sumstats_combine['sumstats']]
 
     # rename cols
     bim.rename(columns={'A1': 'A1_ref', 'A2': 'A2_ref'}, inplace=True)
-    dfs[0].rename(columns={'A1': 'A1_x', 'A2': 'A2_x', 'N': 'N_x', 'Z': 'Z_x'},
+    df_sumstats1.rename(columns={'A1': 'A1_x', 'A2': 'A2_x', 'N': 'N_x', 'Z':'Z_x'}, 
         inplace=True)
-    dfs[1].rename(columns={'A1': 'A1_y', 'A2': 'A2_y', 'N': 'N_y', 'Z': 'Z_y'},
-        inplace=True)
+    for i in range(Nsumstats):
+        df_sumstats_combine[i].rename(columns={'A1': 'A1_{}'.format(i), 
+            'A2': 'A2_{}'.format(i), 'N': 'N_{}'.format(i), 'Z': 'Z_{}'.format(i)}, 
+            inplace=True)
 
     # take overlap between output and ref genotype files
-    df = pd.merge(bim, dfs[1], on=['SNP']).merge(dfs[0], on=['SNP'])
+
+    df = pd.merge(bim, df_sumstats1, on=['SNP'])
+
+    for i in range(Nsumstats):
+        df = df.merge(df_sumstats_combine[i], on=['SNP'])
 
     # flip sign of z-score for allele reversals
-    allign_alleles(df)
-    df = df[matched_or_reversed(df)]
+    allign_alleles(df, Nsumstats)
     df = df[np.logical_not(df.SNP.duplicated(keep=False))]
+
+    Z_y = np.zeros(len(df), dtype=float)
+    if Nlst is None:
+        df_Nlst = pd.DataFrame({'N':[np.max(df['N_{}'.format(i)]) 
+            for i in range(Nsumstats)]})
+    else:
+        df_Nlst = pd.read_csv(Nlst, header=None, names=['N'], delim_whitespace=True)
+
+    for i in range(Nsumstats):
+        Z_y += df['Z_{}'.format(i)] * sumstats_combine['weights'].iloc[i] / np.sqrt(df_Nlst['N'].iloc[i])
+    
+    df['Z_y'] = Z_y
+
+    if N1 is None:
+        N1 = df_sumstats1['N_x'].max()
+
     return (df[['CHR', 'SNP', 'Z_x', 'Z_y']],
-            dfs[0]['N_x'].max(),
-            dfs[1]['N_y'].max(),
-            annots)
+            N1)
  

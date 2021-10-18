@@ -44,7 +44,7 @@ def pipeline(args):
         raise ValueError('--out flag points to an invalid path.')
 
     print('Preparing files for analysis...')
-    gwas_snps, N1 = prep(args.bfile, args.sumstats1, args.sumstatslst, args.Nlst)
+    gwas_snps, N1 = prep(args.bfile, args.sumstats1, args.sumstatslst, args.N1, args.Nlst)
     if args.N1 is not None:
         N1 = args.N1
     print('Calculating LD scores...')
