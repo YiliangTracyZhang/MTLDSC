@@ -109,7 +109,7 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
     for i in range(Nsumstats):
         Z_y += df['Z_{}'.format(i)] * sumstats_combine['weights'].iloc[i] / np.sqrt(df_Nlst['N'].iloc[i])
     
-    df['Z_y'] = Z_y
+    df.iloc[:, 'Z_y'] = Z_y
 
     if N1 is None:
         N1 = df_sumstats1['N_x'].max()

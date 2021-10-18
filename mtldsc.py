@@ -45,8 +45,6 @@ def pipeline(args):
 
     print('Preparing files for analysis...')
     gwas_snps, N1 = prep(args.bfile, args.sumstats1, args.sumstatslst, args.N1, args.Nlst)
-    if args.N1 is not None:
-        N1 = args.N1
     print('Calculating LD scores...')
     ld_scores = ldscore(args.bfile, gwas_snps)
     print('Calculating correlation...')
