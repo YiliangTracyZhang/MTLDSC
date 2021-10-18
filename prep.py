@@ -20,6 +20,7 @@ def allign_alleles(df, Nsumstats):
     df = matched_or_reversed(df, ref_allele, 'x', d)
     for i in range(Nsumstats):
         df = matched_or_reversed(df, ref_allele, i, d)
+    return df
 
 def matched_or_reversed(df, ref_allele, suffix, d):
     allele = []
@@ -96,7 +97,7 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
         df = df.merge(df_sumstats_combine[i], on=['SNP'])
 
     # flip sign of z-score for allele reversals
-    allign_alleles(df, Nsumstats)
+    df = allign_alleles(df, Nsumstats)
     df = df[np.logical_not(df.SNP.duplicated(keep=False))]
 
     Z_y = np.zeros(len(df), dtype=float)
@@ -112,7 +113,7 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
     df.loc[:, 'Z_y'] = Z_y
 
     if N1 is None:
-        N1 = df_sumstats1['N_x'].max()
+        N1 = df['N_x'].max()
 
     return (df[['CHR', 'SNP', 'Z_x', 'Z_y']],
             N1)
