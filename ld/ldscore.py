@@ -24,7 +24,7 @@ def getBlockLefts(coords, max_dist):
     M = len(coords)
     j = 0
     block_left = np.zeros(M)
-    for i in xrange(M):
+    for i in range(M):
         while j < M and abs(coords[j] - coords[i]) > max_dist:
             j += 1
 
@@ -51,7 +51,7 @@ def block_left_to_right(block_left):
     M = len(block_left)
     j = 0
     block_right = np.zeros(M)
-    for i in xrange(M):
+    for i in range(M):
         while j < M and block_left[j] <= i:
             j += 1
 
@@ -65,7 +65,7 @@ class __GenotypeArrayInMemory__(object):
     Parent class for various classes containing interfaces for files with genotype
     matrices, e.g., plink .bed files, etc
     '''
-    def __init__(self, fname, n, snp_list, log, keep_snps=None, keep_indivs=None, mafMin=None):
+    def __init__(self, fname, n, snp_list, keep_snps=None, keep_indivs=None, mafMin=None):
         self.m = len(snp_list.IDList)
         self.n = n
         self.keep_snps = keep_snps
@@ -84,9 +84,7 @@ class __GenotypeArrayInMemory__(object):
             (self.geno, self.m, self.n) = self.__filter_indivs__(self.geno, keep_indivs, self.m,
                 self.n)
 
-            if self.n > 0:
-                log.log('After filtering, {n} individuals remain'.format(n=self.n))
-            else:
+            if self.n == 0:
                 raise ValueError('After filtering, no individuals remain')
 
         # filter SNPs
@@ -98,9 +96,7 @@ class __GenotypeArrayInMemory__(object):
         (self.geno, self.m, self.n, self.kept_snps, self.freq) = self.__filter_snps_maf__(
             self.geno, self.m, self.n, self.mafMin, keep_snps)
 
-        if self.m > 0:
-            log.log('After filtering, {m} SNPs remain'.format(m=self.m))
-        else:
+        if self.m == 0:
             raise ValueError('After filtering, no SNPs remain')
 
         self.df = self.df[self.kept_snps, :]
@@ -123,6 +119,13 @@ class __GenotypeArrayInMemory__(object):
         func = lambda x: self.__l2_unbiased__(x, self.n)
         snp_getter = self.nextSNPs
         return self.__corSumVarBlocks__(block_left, c, func, snp_getter, annot)
+
+    def ldCorrVarBlocks(self, block_left, idx):
+        '''Computes an empirical estimate of pairwise correlation '''
+        self._currentSNP = idx.index[idx][0]
+        func = lambda x: self.__l2_unbiased__(x, self.n)
+        snp_getter = self.nextSNPs
+        return self.__LDmatrix__(block_left, snp_getter, func, idx)
 
     def ldScoreBlockJackknife(self, block_left, c, annot=None, jN=10):
         func = lambda x: np.square(x)
@@ -176,7 +179,8 @@ class __GenotypeArrayInMemory__(object):
         n_a = annot.shape[1]  # number of annotations
         cor_sum = np.zeros((m, n_a))
         # b = index of first SNP for which SNP 0 is not included in LD Score
-        b = np.nonzero(block_left > 0)
+        bb = block_left > 0
+        b = bb.nonzero()
         if np.any(b):
             b = b[0][0]
         else:
@@ -190,7 +194,7 @@ class __GenotypeArrayInMemory__(object):
         rfuncAB = np.zeros((b, c))
         rfuncBB = np.zeros((c, c))
         # chunk inside of block
-        for l_B in xrange(0, b, c):  # l_B := index of leftmost SNP in matrix B
+        for l_B in range(0, b, c):  # l_B := index of leftmost SNP in matrix B
             B = A[:, l_B:l_B+c]
             np.dot(A.T, B / n, out=rfuncAB)
             rfuncAB = func(rfuncAB)
@@ -199,7 +203,7 @@ class __GenotypeArrayInMemory__(object):
         b0 = b
         md = int(c*np.floor(m/c))
         end = md + 1 if md != m else md
-        for l_B in xrange(b0, end, c):
+        for l_B in range(b0, end, c):
             # check if the annot matrix is all zeros for this block + chunk
             # this happens w/ sparse categories (i.e., pathways)
             # update the block
@@ -240,12 +244,112 @@ class __GenotypeArrayInMemory__(object):
 
         return cor_sum
 
+    def __LDmatrix__(self, block_left, snp_getter, func, idx):
+        '''
+        LD_mat : a matrix that stores the pairwise correlation.
+
+        '''
+        c = 5
+        m, n = np.sum(idx), self.n
+        LD_mat = np.zeros((m,m))       
+        block_sizes = np.array(np.arange(m) - block_left)
+        block_sizes = np.ceil(block_sizes / c)*c           
+        
+        annot = np.ones((m, 1))
+        n_a = 1
+        cor_sum = np.zeros((m, n_a))
+        bb = block_left > 0
+        b = bb.nonzero()
+        if np.any(b):
+            b = b[0][0]
+        else:
+            b = m
+        b = int(np.ceil(b/c)*c)  # round up to a multiple of c
+        if b > m:
+            c = 1
+            b = m
+        l_A = 0  # l_A := index of leftmost SNP in matrix A
+        
+        A = snp_getter(b)
+
+        rfuncAB = np.zeros((b, c))
+        rfuncBB = np.zeros((c, c))
+        
+        
+        # chunk inside of block
+        for l_B in range(0, b, c):  # l_B := index of leftmost SNP in matrix B
+            B = A[:, l_B:l_B+c]
+            # pairwise correlation
+            np.dot(A.T, B / n, out=rfuncAB)
+            
+            # store the correlation in matrix 
+            LD_mat[0:b,l_B:l_B+c] = rfuncAB #ld matrix  
+                        
+            # calculate ld scores
+            rfuncAB = func(rfuncAB)
+            cor_sum[l_A:l_A+b, :] += np.dot(rfuncAB, annot[l_B:l_B+c, :])#
+        
+        # right of first window
+        b0 = b
+        md = int(c*np.floor(m/c))
+        end = md + 1 if md != m else md
+            
+        for l_B in range(b0, end, c):
+            # check if the annot matrix is all zeros for this block + chunk
+            # this happens w/ sparse categories (i.e., pathways)
+            # update the block
+            old_b = b
+            b = int(block_sizes[l_B])
+            if l_B > b0 and b > 0:
+                # block_size can't increase more than c
+                # block_size can't be less than c unless it is zero
+                # both of these things make sense
+                A = np.hstack((A[:, old_b-b+c:old_b], B))
+                l_A += old_b-b+c
+            elif l_B == b0 and b > 0:
+                A = A[:, b0-b:b0]
+                l_A = b0-b
+            elif b == 0:  # no SNPs to left in window, e.g., after a sequence gap
+                A = np.array(()).reshape((n, 0))
+                l_A = l_B
+            if l_B == md:
+                c = m - md
+                rfuncAB = np.zeros((b, c))
+                rfuncBB = np.zeros((c, c))
+            if b != old_b:
+                rfuncAB = np.zeros((b, c))
+
+            B = snp_getter(c) # read next c snps
+            
+            p1 = np.all(annot[l_A:l_A+b, :] == 0)
+            p2 = np.all(annot[l_B:l_B+c, :] == 0)
+            if p1 and p2:
+                continue
+            
+            ## get pairwise correlation
+            np.dot(A.T, B / n, out=rfuncAB)
+            np.dot(B.T, B / n, out=rfuncBB) 
+            
+            ### store the output in matrix 
+            LD_mat[l_A:l_A+b,l_B:l_B+c] = rfuncAB  #ld matrix
+            LD_mat[l_B:l_B+c,l_A:l_A+b] = rfuncAB.T #ld matrix
+            LD_mat[l_B:l_B+c,l_B:l_B+c] = rfuncBB  #ld matrix              
+                        
+
+            rfuncAB = func(rfuncAB)
+            rfuncBB = func(rfuncBB)
+            cor_sum[l_A:l_A+b, :] += np.dot(rfuncAB, annot[l_B:l_B+c, :])#
+            cor_sum[l_B:l_B+c, :] += np.dot(annot[l_A:l_A+b, :].T, rfuncAB).T#
+            cor_sum[l_B:l_B+c, :] += np.dot(rfuncBB, annot[l_B:l_B+c, :])#
+        
+        return cor_sum, LD_mat 
+
 
 class PlinkBEDFile(__GenotypeArrayInMemory__):
     '''
     Interface for Plink .bed format
     '''
-    def __init__(self, fname, n, snp_list, log, keep_snps=None, keep_indivs=None, mafMin=None):
+    def __init__(self, fname, n, snp_list, keep_snps=None, keep_indivs=None, mafMin=None):
         self._bedcode = {
             2: ba.bitarray('11'),
             9: ba.bitarray('10'),
@@ -253,7 +357,7 @@ class PlinkBEDFile(__GenotypeArrayInMemory__):
             0: ba.bitarray('00')
             }
 
-        __GenotypeArrayInMemory__.__init__(self, fname, n, snp_list, log, keep_snps=keep_snps,
+        __GenotypeArrayInMemory__.__init__(self, fname, n, snp_list, keep_snps=keep_snps,
             keep_indivs=keep_indivs, mafMin=mafMin)
 
     def __read__(self, fname, m, n):
@@ -334,7 +438,7 @@ class PlinkBEDFile(__GenotypeArrayInMemory__):
         m_poly = 0
         y = ba.bitarray()
         if keep_snps is None:
-            keep_snps = xrange(m)
+            keep_snps = range(m)
         kept_snps = []
         freq = []
         for e, j in enumerate(keep_snps):
@@ -396,7 +500,7 @@ class PlinkBEDFile(__GenotypeArrayInMemory__):
         X = np.array(slice.decode(self._bedcode), dtype="float64").reshape((b, nru)).T
         X = X[0:n, :]
         Y = np.zeros(X.shape)
-        for j in xrange(0, b):
+        for j in range(0, b):
             newsnp = X[:, j]
             ii = newsnp != 9
             avg = np.mean(newsnp[ii])
