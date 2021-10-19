@@ -44,11 +44,11 @@ def pipeline(args):
         raise ValueError('--out flag points to an invalid path.')
 
     print('Preparing files for analysis...')
-    gwas_snps, N1 = prep(args.bfile, args.sumstats1, args.sumstatslst, args.N1, args.Nlst)
+    gwas_snps, N1, intercept = prep(args.bfile, args.sumstats1, args.sumstatslst, args.N1, args.Nlst)
     print('Calculating LD scores...')
     ld_scores = ldscore(args.bfile, gwas_snps)
     print('Calculating correlation...')
-    out = calculate(gwas_snps, ld_scores, N1)
+    out = calculate(gwas_snps, ld_scores, N1, intercept)
     out.to_csv(args.out, sep=' ', na_rep='NA', index=False)
 
 

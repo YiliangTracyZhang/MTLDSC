@@ -98,6 +98,7 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
     allign_alleles(df, Nsumstats)
     df = df.loc[np.logical_not(df.SNP.duplicated(keep=False))]
     Z_y = np.zeros(len(df), dtype=float)
+    intercept = 0
     if Nlst is None:
         df_Nlst = pd.DataFrame({'N':[np.max(df['N_{}'.format(i)]) 
             for i in range(Nsumstats)]})
@@ -106,6 +107,7 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
 
     for i in range(Nsumstats):
         Z_y += df['Z_{}'.format(i)] * sumstats_combine['weights'].iloc[i] / np.sqrt(df_Nlst['N'].iloc[i])
+        intercept += sumstats_combine['weights'].iloc[i] ** 2 / df_Nlst['N'].iloc[i]
     
     df.loc[:, 'Z_y'] = Z_y
 
@@ -113,5 +115,5 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
         N1 = df['N_x'].max()
 
     return (df.loc[:, ['CHR', 'SNP', 'Z_x', 'Z_y']],
-            N1)
+            N1, intercept)
  

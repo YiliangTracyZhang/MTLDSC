@@ -8,53 +8,11 @@ from sklearn import linear_model
 from scipy.stats import norm
 from numpy.linalg import inv
 
-def calculate(gwas_snps, ld_scores, annots, N1, N2):
-    np.seterr(invalid='ignore')
-
-    ###   Clean up data   ###
-    if annots is None:
-        annot = ld_scores[['SNP']]
-        annot['ALL_'] = 1
-    else:
-        annot = pd.concat(annots)
-
-    ld_snps = set(ld_scores['SNP'])
-    annot = annot.loc[annot['SNP'].isin(ld_snps)].reset_index(drop=True)
-
+def calculate(gwas_snps, ld_scores, N1, intercept):
     ld_scores = ld_scores.drop(['CHR', 'BP', 'CM', 'MAF'], axis=1, errors='ignore').reset_index(drop=True)
-    annot = annot.drop(['BP', 'SNP', 'CHR', 'CM'], axis=1, errors='ignore')
-    gwas_snps.drop(['idx'], axis=1, errors='ignore', inplace=True)
-
-    num_annotations = len(annot.columns)
-
-    merged = pd.merge(gwas_snps,
-                      pd.concat([ld_scores, annot], axis=1),
-                      on=['SNP'])
+    merged = pd.merge(gwas_snps, ld_scores, on=['SNP'])
 
     ld_score_all = merged.iloc[:,4]
-    if num_annotations == 1:  # non-stratified analysis
-        ld_scores = merged.iloc[:,4:5]
-        annot = merged.iloc[:,5:6]
-
-    else:  # we added in an all 1's column in prep step, so exclude that
-        ld_scores = merged.iloc[:,5:4 + num_annotations]
-        annot = merged.iloc[:,5 + num_annotations: 4 + 2 * num_annotations]
-        num_annotations -= 1
-
-    ###   Calculate genetic correlation   ###
-    # Calculate S and W matrix
-    P = annot.sum()
-    p0 = len(ld_scores)
-
-    S = np.empty([num_annotations, num_annotations])
-    for i, j in product(range(num_annotations), range(num_annotations)):
-        S[i][j] = np.sum(ld_scores[annot.iloc[:,i] == 1].iloc[:,j]) / (P[i] * P[j])
-
-    W = np.empty([num_annotations, num_annotations])
-    for i, j in product(range(num_annotations), range(num_annotations)):
-        W[i][j] = np.sum((annot.iloc[:,i]==1) & (annot.iloc[:,j]==1)) / np.sum(annot.iloc[:,j] == 1)
-
-    # Calculate heritability
     Z_x, Z_y = merged['Z_x'], merged['Z_y']
 
     h2_1 = np.array([p0 * (np.mean(Z_x ** 2) - 1) / (N1 * np.mean(ld_score_all))])
