@@ -65,7 +65,7 @@ parser.add_argument('--bfile', required=True, type=str,
 parser.add_argument('--N1', type=int,
     help='N of the sumstats1 file. If not provided, this value will be inferred '
     'from the sumstats1 arg.')
-parser.add_argument('--Nlst', type=int,
+parser.add_argument('--Nlst', type=str,
     help='The list of N of the sumstats in sumstatslst. If not provided, this value will be inferred '
     'from the sumstats.')
 
