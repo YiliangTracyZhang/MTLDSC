@@ -89,10 +89,10 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
     p_value = norm.sf(abs(corr / se_corr)) * 2
 
     out = pd.DataFrame(collections.OrderedDict(
-        [('corr', corr),
-         ('se', se_corr),
-         ('pvalue', p_value),
-         ('p0', p0)
+        [('corr', [corr]),
+         ('se', [se_corr]),
+         ('pvalue', [p_value]),
+         ('p0', [p0])
         ]
     ))
 
