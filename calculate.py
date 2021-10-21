@@ -66,7 +66,7 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
         h1_2y_curr = h1_2y_tot - np.sum(ldscore_b * wh1_b * (Z_x_b ** 2 - 1))
         Xwh_curr = np.vstack([wh2_b, wh2_b * ldscore_b])
         h2_2x_curr = h2_2x_tot - Xwh_curr.dot(np.vstack([np.ones(len(ldscore_b)), ldscore_b]).T)
-        h2_2y_curr = h2_2y_tot - Xwh_curr.dot(Xwh_curr.dot(Z_y_b ** 2))
+        h2_2y_curr = h2_2y_tot - Xwh_curr.dot(Z_y_b ** 2)
         Xw_curr = np.vstack([w_b, w_b * ldscore_b])
         cov_x_curr = cov_x_tot - Xw_curr.dot(np.vstack([np.ones(len(ldscore_b)), ldscore_b]).T)
         cov_y_curr = cov_y_tot - Xw_curr.dot(Z_x_b * Z_y_b)
