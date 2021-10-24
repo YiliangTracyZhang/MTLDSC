@@ -35,7 +35,8 @@ def matched_or_reversed(df, ref_allele, suffix, d):
         ((ref_allele[0] == 3 - allele[1]) & (ref_allele[1] == 3 - allele[0])))
     df.loc[:, "Z_{}".format(suffix)] *= -2 * reversed_alleles + 1
     df.where(pd.Series(matched_alleles|reversed_alleles), inplace=True)
-    df.dropna(inplace=True).reset_index(drop=True, inplace=True)
+    df.dropna(inplace=True)
+    df.reset_index(drop=True, inplace=True)
     ref_allele[0] = ref_allele[0][matched_alleles|reversed_alleles]
     ref_allele[1] = ref_allele[1][(matched_alleles|reversed_alleles)]
 
@@ -75,24 +76,21 @@ def prep(bfile, sumstats1, sumstatslst, N1, Nlst):
 
     df_sumstats1 = pd.read_csv(sumstats1, delim_whitespace=True)
 
-    df_sumstats_combine = [pd.read_csv(file, delim_whitespace=True)
-                            for file in sumstats_combine['sumstats']]
-
     # rename cols
     bim.rename(columns={'A1': 'A1_ref', 'A2': 'A2_ref'}, inplace=True)
     df_sumstats1.rename(columns={'A1': 'A1_x', 'A2': 'A2_x', 'N': 'N_x', 'Z':'Z_x'}, 
         inplace=True)
-    for i in range(Nsumstats):
-        df_sumstats_combine[i].rename(columns={'A1': 'A1_{}'.format(i), 
-            'A2': 'A2_{}'.format(i), 'N': 'N_{}'.format(i), 'Z': 'Z_{}'.format(i)}, 
-            inplace=True)
 
     # take overlap between output and ref genotype files
 
     df = pd.merge(bim, df_sumstats1, on=['SNP'])
 
     for i in range(Nsumstats):
-        df = df.merge(df_sumstats_combine[i], on=['SNP'])
+        df_sumstats_combine = pd.read_csv(sumstats_combine['sumstats'].iloc[i], 
+            delim_whitespace=True)
+        df_sumstats_combine.rename(columns={'A1': 'A1_{}'.format(i), 'A2': 'A2_{}'.format(i), 
+            'N': 'N_{}'.format(i), 'Z': 'Z_{}'.format(i)}, inplace=True)
+        df = df.merge(df_sumstats_combine, on=['SNP'])
 
     # flip sign of z-score for allele reversals
     allign_alleles(df, Nsumstats)
