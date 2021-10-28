@@ -48,34 +48,40 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
 
     # Calculate Jackknife variance estimate
     nblock = 200
-    corr_block = np.empty(nblock)
+    cov_block = np.empty(nblock)
+    # h1_block = np.empty(nblock)
+    # h2_block = np.empty(nblock)
     
-    h1_2x_tot = np.sum((ld_score_all ** 2) * wh1)
-    h1_2y_tot = np.sum(ld_score_all * wh1 * (Z_x ** 2 - 1))
-    Xwh = np.vstack([wh2, wh2 * ld_score_all])
-    h2_2x_tot = Xwh.dot(np.vstack([np.ones(len(ld_score_all)), ld_score_all]).T)
-    h2_2y_tot = Xwh.dot(Z_y ** 2)
+    # h1_2x_tot = np.sum((ld_score_all ** 2) * wh1)
+    # h1_2y_tot = np.sum(ld_score_all * wh1 * (Z_x ** 2 - 1))
+    # Xwh = np.vstack([wh2, wh2 * ld_score_all])
+    # h2_2x_tot = Xwh.dot(np.vstack([np.ones(len(ld_score_all)), ld_score_all]).T)
+    # h2_2y_tot = Xwh.dot(Z_y ** 2)
     Xw = np.vstack([w, w * ld_score_all])
     cov_x_tot = Xw.dot(np.vstack([np.ones(len(ld_score_all)), ld_score_all]).T)
     cov_y_tot = Xw.dot(Z_x * Z_y)
 
-    for j, (ldscore_b, Z_x_b, Z_y_b, wh1_b, wh2_b, w_b) in enumerate(zip(np.array_split(ld_score_all, nblock),
-        np.array_split(Z_x, nblock), np.array_split(Z_y, nblock), np.array_split(wh1, nblock),
-        np.array_split(wh2, nblock), np.array_split(w, nblock))):
-        h1_2x_curr = h1_2x_tot - np.sum((ldscore_b ** 2) * wh1_b)
-        h1_2y_curr = h1_2y_tot - np.sum(ldscore_b * wh1_b * (Z_x_b ** 2 - 1))
-        Xwh_curr = np.vstack([wh2_b, wh2_b * ldscore_b])
-        h2_2x_curr = h2_2x_tot - Xwh_curr.dot(np.vstack([np.ones(len(ldscore_b)), ldscore_b]).T)
-        h2_2y_curr = h2_2y_tot - Xwh_curr.dot(Z_y_b ** 2)
+    # for j, (ldscore_b, Z_x_b, Z_y_b, wh1_b, wh2_b, w_b) in enumerate(zip(np.array_split(ld_score_all, nblock),
+    #     np.array_split(Z_x, nblock), np.array_split(Z_y, nblock), np.array_split(wh1, nblock),
+    #     np.array_split(wh2, nblock), np.array_split(w, nblock))):
+    for j, (ldscore_b, Z_x_b, Z_y_b, w_b) in enumerate(zip(np.array_split(ld_score_all, nblock),
+        np.array_split(Z_x, nblock), np.array_split(Z_y, nblock), np.array_split(w, nblock))):
+        # h1_2x_curr = h1_2x_tot - np.sum((ldscore_b ** 2) * wh1_b)
+        # h1_2y_curr = h1_2y_tot - np.sum(ldscore_b * wh1_b * (Z_x_b ** 2 - 1))
+        # Xwh_curr = np.vstack([wh2_b, wh2_b * ldscore_b])
+        # h2_2x_curr = h2_2x_tot - Xwh_curr.dot(np.vstack([np.ones(len(ldscore_b)), ldscore_b]).T)
+        # h2_2y_curr = h2_2y_tot - Xwh_curr.dot(Z_y_b ** 2)
         Xw_curr = np.vstack([w_b, w_b * ldscore_b])
         cov_x_curr = cov_x_tot - Xw_curr.dot(np.vstack([np.ones(len(ldscore_b)), ldscore_b]).T)
         cov_y_curr = cov_y_tot - Xw_curr.dot(Z_x_b * Z_y_b)
 
-        h1_2_curr = (h1_2y_curr * p0 / h1_2x_curr) / N1
-        h2_2_curr = inv(h2_2x_curr).dot(h2_2y_curr)[1] * p0
+        # h1_2_curr = (h1_2y_curr * p0 / h1_2x_curr) / N1
+        # h2_2_curr = inv(h2_2x_curr).dot(h2_2y_curr)[1] * p0
         cov_curr = inv(cov_x_curr).dot(cov_y_curr)[1] * p0 / np.sqrt(N1)
 
-        corr_block[j] = cov_curr / np.sqrt(h1_2_curr * h2_2_curr)
+        cov_block[j] = cov_curr
+        # h1_block[j] = h1_2_curr
+        # h2_block[j] = h2_2_curr
     
     # genetic correlation
     corr = arho / np.sqrt(aarho * h1_2)
@@ -85,7 +91,8 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
               'estimates were negative.')
 
     # p-value and standard error
-    se_corr = np.sqrt(np.var(corr_block) * (nblock - 1))
+    se_cov = np.sqrt(np.var(cov_block) * (nblock - 1))
+    se_corr = se_cov / np.sqrt(aarho * h1_2)
     p_value = norm.sf(abs(corr / se_corr)) * 2
 
     out = pd.DataFrame(collections.OrderedDict(
