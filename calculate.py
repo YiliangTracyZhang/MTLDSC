@@ -17,7 +17,11 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
     p0 = len(merged)
 
     h1_2 = p0 * (np.mean(Z_x ** 2) - 1) / (N1 * np.mean(ld_score_all))
+    if h1_2 < 0:
+        h1_2 = 0
     aarho = p0 * (np.mean(Z_y ** 2) - intercept) / np.mean(ld_score_all)
+    if aarho < 0:
+        aarho = 0
     arho = np.sum(Z_x * Z_y) / (np.sqrt(N1) * np.mean(ld_score_all))
 
     w1 = 1 + N1 * h1_2 * ld_score_all / p0
@@ -28,9 +32,15 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
 
     h1_2 = (np.sum(ld_score_all * wh1 * (Z_x ** 2 - 1)) / np.sum((ld_score_all ** 2) * wh1)) * (p0 / N1)
     aarho_m = linear_model.LinearRegression().fit(pd.DataFrame(ld_score_all), pd.DataFrame(Z_y ** 2), sample_weight=wh2)
-
+    if h1_2 < 0:
+        h1_2 = 0
     intercept = aarho_m.intercept_[0]
     aarho = aarho_m.coef_[0][0] * p0
+
+    if intercept < 0:
+        intercept = 0
+    if aarho < 0:
+        aarho = 0
 
     w1 = 1 + N1 * h1_2 * ld_score_all / p0
     w2 = intercept + aarho * ld_score_all / p0
