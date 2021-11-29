@@ -101,6 +101,7 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
     out = pd.DataFrame(collections.OrderedDict(
         [('corr', [corr]),
          ('se', [se_corr]),
+         ('h1_2', [h1_2]),
          ('pvalue', [p_value]),
          ('p0', [p0])
         ]
