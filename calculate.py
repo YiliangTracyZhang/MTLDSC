@@ -102,6 +102,7 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
         [('corr', [corr]),
          ('se', [se_corr]),
          ('h1_2', [h1_2]),
+         ('h2_2', [aarho]),
          ('pvalue', [p_value]),
          ('p0', [p0])
         ]
