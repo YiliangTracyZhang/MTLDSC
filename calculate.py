@@ -30,19 +30,25 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
     wh1 = 1 / (w1 ** 2)
     wh2 = 1 / (w2 ** 2)
 
-    h1_2 = (np.sum(ld_score_all * wh1 * (Z_x ** 2 - 1)) / np.sum((ld_score_all ** 2) * wh1)) * (p0 / N1)
+    h1_2_m = linear_model.LinearRegression().fit(pd.DataFrame(ld_score_all), pd.DataFrame(Z_x ** 2), sample_weight=wh1)
+    #h1_2 = (np.sum(ld_score_all * wh1 * (Z_x ** 2 - 1)) / np.sum((ld_score_all ** 2) * wh1)) * (p0 / N1)
     aarho_m = linear_model.LinearRegression().fit(pd.DataFrame(ld_score_all), pd.DataFrame(Z_y ** 2), sample_weight=wh2)
+    
+    h1_intercept = h1_2_m.intercept_[0]
+    h1_2 = h1_2_m.coef_[0][0] * (p0 / N1)
+    
     if h1_2 < 0:
         h1_2 = 0
+    
     intercept = aarho_m.intercept_[0]
     aarho = aarho_m.coef_[0][0] * p0
 
-    if intercept < 0:
-        intercept = 0
+    # if intercept < 0:
+    #     intercept = 0
     if aarho < 0:
         aarho = 0
 
-    w1 = 1 + N1 * h1_2 * ld_score_all / p0
+    w1 = h1_intercept + N1 * h1_2 * ld_score_all / p0
     w2 = intercept + aarho * ld_score_all / p0
     w3 = np.sqrt(N1) * ld_score_all * arho / p0
     wh1 = 1 / (w1 ** 2)
@@ -60,8 +66,11 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
     nblock = 200
     corr_block = np.empty(nblock)
     
-    h1_2x_tot = np.sum((ld_score_all ** 2) * wh1)
-    h1_2y_tot = np.sum(ld_score_all * wh1 * (Z_x ** 2 - 1))
+    # h1_2x_tot = np.sum((ld_score_all ** 2) * wh1)
+    # h1_2y_tot = np.sum(ld_score_all * wh1 * (Z_x ** 2 - 1))
+    Xwh1 = np.vstack([wh1, wh1 * ld_score_all])
+    h1_2x_tot = Xwh1.dot(np.vstack([np.ones(len(ld_score_all)), ld_score_all]).T)
+    h1_2y_tot = Xwh1.dot(Z_x ** 2)
     Xwh = np.vstack([wh2, wh2 * ld_score_all])
     h2_2x_tot = Xwh.dot(np.vstack([np.ones(len(ld_score_all)), ld_score_all]).T)
     h2_2y_tot = Xwh.dot(Z_y ** 2)
@@ -72,8 +81,9 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
     for j, (ldscore_b, Z_x_b, Z_y_b, wh1_b, wh2_b, w_b) in enumerate(zip(np.array_split(ld_score_all, nblock),
         np.array_split(Z_x, nblock), np.array_split(Z_y, nblock), np.array_split(wh1, nblock),
         np.array_split(wh2, nblock), np.array_split(w, nblock))):
-        h1_2x_curr = h1_2x_tot - np.sum((ldscore_b ** 2) * wh1_b)
-        h1_2y_curr = h1_2y_tot - np.sum(ldscore_b * wh1_b * (Z_x_b ** 2 - 1))
+        Xwh1_curr = np.vstack([wh1_b, wh1_b * ldscore_b])
+        h1_2x_curr = h1_2x_tot - Xwh1_curr.dot(np.vstack([np.ones(len(ldscore_b)), ldscore_b]).T)
+        h1_2y_curr = h1_2y_tot - Xwh1_curr.dot(Z_x_b ** 2)
         Xwh_curr = np.vstack([wh2_b, wh2_b * ldscore_b])
         h2_2x_curr = h2_2x_tot - Xwh_curr.dot(np.vstack([np.ones(len(ldscore_b)), ldscore_b]).T)
         h2_2y_curr = h2_2y_tot - Xwh_curr.dot(Z_y_b ** 2)
@@ -81,7 +91,8 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
         cov_x_curr = cov_x_tot - Xw_curr.dot(np.vstack([np.ones(len(ldscore_b)), ldscore_b]).T)
         cov_y_curr = cov_y_tot - Xw_curr.dot(Z_x_b * Z_y_b)
 
-        h1_2_curr = (h1_2y_curr * p0 / h1_2x_curr) / N1
+        h1_2_curr = inv(h1_2x_curr).dot(h1_2y_curr)[1] * (p0 / N1)
+        # h1_2_curr = (h1_2y_curr * p0 / h1_2x_curr) / N1
         h2_2_curr = inv(h2_2x_curr).dot(h2_2y_curr)[1] * p0
         cov_curr = inv(cov_x_curr).dot(cov_y_curr)[1] * p0 / np.sqrt(N1)
 
