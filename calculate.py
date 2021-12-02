@@ -4,6 +4,7 @@ import collections
 from itertools import product
 import numpy as np
 import pandas as pd
+from ldsc_thin import ldscore
 from scipy.stats import norm
 from sklearn import linear_model
 from numpy.linalg import inv
@@ -53,14 +54,14 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
     w3 = np.sqrt(N1) * ld_score_all * arho / p0
     wh1 = 1 / (w1 ** 2)
     wh2 = 1 / (w2 ** 2)
-    w = 1 / (w1 * w2 + w3 * w3)
+    w = 1 / ((w1 * w2 + w3 * w3) * ld_score_all)
 
     m = linear_model.LinearRegression().fit(pd.DataFrame(ld_score_all), pd.DataFrame(Z_x * Z_y), sample_weight=w)
     corr_pheno = m.intercept_[0]
     arho = m.coef_[0][0] * p0 / np.sqrt(N1)
 
     w3 = np.sqrt(N1) * ld_score_all * arho / p0 + corr_pheno
-    w = 1 / (w1 * w2 + w3 * w3)
+    w = 1 / ((w1 * w2 + w3 * w3) * ld_score_all)
 
     # Calculate Jackknife variance estimate
     nblock = 200
