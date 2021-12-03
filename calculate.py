@@ -28,8 +28,8 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
     w1 = 1 + N1 * h1_2 * ld_score_all / p0
     w2 = intercept + aarho * ld_score_all / p0
 
-    wh1 = 1 / (w1 ** 2)
-    wh2 = 1 / (w2 ** 2)
+    wh1 = 1 / (ld_score_all * w1 ** 2)
+    wh2 = 1 / (ld_score_all * w2 ** 2)
 
     h1_2_m = linear_model.LinearRegression().fit(pd.DataFrame(ld_score_all), pd.DataFrame(Z_x ** 2), sample_weight=wh1)
     #h1_2 = (np.sum(ld_score_all * wh1 * (Z_x ** 2 - 1)) / np.sum((ld_score_all ** 2) * wh1)) * (p0 / N1)
@@ -52,8 +52,8 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
     w1 = h1_intercept + N1 * h1_2 * ld_score_all / p0
     w2 = intercept + aarho * ld_score_all / p0
     w3 = np.sqrt(N1) * ld_score_all * arho / p0
-    wh1 = 1 / (w1 ** 2)
-    wh2 = 1 / (w2 ** 2)
+    wh1 = 1 / (ld_score_all * w1 ** 2)
+    wh2 = 1 / (ld_score_all * w2 ** 2)
     w = 1 / ((w1 * w2 + w3 * w3) * ld_score_all)
 
     m = linear_model.LinearRegression().fit(pd.DataFrame(ld_score_all), pd.DataFrame(Z_x * Z_y), sample_weight=w)
