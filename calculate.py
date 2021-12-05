@@ -96,11 +96,18 @@ def calculate(gwas_snps, ld_scores, N1, intercept):
         # h1_2_curr = (h1_2y_curr * p0 / h1_2x_curr) / N1
         h2_2_curr = inv(h2_2x_curr).dot(h2_2y_curr)[1] * p0
         cov_curr = inv(cov_x_curr).dot(cov_y_curr)[1] * p0 / np.sqrt(N1)
-
-        corr_block[j] = cov_curr / np.sqrt(h1_2_curr * h2_2_curr)
+        if h1_2_curr < 0:
+            h1_2_curr = h1_2
+        if h2_2_curr < 0:
+            h2_2_curr = aarho
+        if h1_2_curr * h2_2_curr != 0:
+            corr_block[j] = cov_curr / np.sqrt(h1_2_curr * h2_2_curr)
     
     # genetic correlation
-    corr = arho / np.sqrt(aarho * h1_2)
+    if aarho * h1_2 != 0:
+        corr = arho / np.sqrt(aarho * h1_2)
+    else:
+        corr = np.nan
 
     if np.isnan(corr).any():
         print('Some correlation estimates are NaN because the heritability '
